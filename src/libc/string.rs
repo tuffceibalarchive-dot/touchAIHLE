@@ -312,9 +312,58 @@ fn strlcpy(
 ) -> GuestUSize {
     GenericChar::<u8>::strlcpy(env, dst, src, size)
 }
+fn strnlen(env: &mut Environment, s: ConstPtr<u8>, max_len: GuestUSize) -> GuestUSize {
+    let mut len: GuestUSize = 0;
+    while len < max_len && env.mem.read(s + len) != 0 {
+        len += 1;
+    }
+    len
+}
+fn strlcat(
+    env: &mut Environment,
+    dst: MutPtr<u8>,
+    src: ConstPtr<u8>,
+    size: GuestUSize,
+) -> GuestUSize {
+    let src_len = strlen(env, src);
+    let mut dst_len: GuestUSize = 0;
+    while dst_len < size && env.mem.read(dst + dst_len) != 0 {
+        dst_len += 1;
+    }
+    if dst_len == size {
+        // dst was not NUL-terminated within `size` bytes
+        return size + src_len;
+    }
+    let room = size - dst_len - 1;
+    let n = src_len.min(room);
+    for i in 0..n {
+        let byte = env.mem.read(src + i);
+        env.mem.write(dst + dst_len + i, byte);
+    }
+    env.mem.write(dst + dst_len + n, 0u8);
+    dst_len + src_len
+}
+fn bcopy(env: &mut Environment, src: ConstVoidPtr, dst: MutVoidPtr, size: GuestUSize) {
+    memmove(env, dst, src, size);
+}
+fn bcmp(env: &mut Environment, a: ConstVoidPtr, b: ConstVoidPtr, size: GuestUSize) -> i32 {
+    memcmp(env, a, b, size)
+}
+fn ffs(_env: &mut Environment, value: i32) -> i32 {
+    if value == 0 {
+        0
+    } else {
+        value.trailing_zeros() as i32 + 1
+    }
+}
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(strtok(_, _)),
+    export_c_func!(strnlen(_, _)),
+    export_c_func!(strlcat(_, _, _)),
+    export_c_func!(bcopy(_, _, _)),
+    export_c_func!(bcmp(_, _, _)),
+    export_c_func!(ffs(_)),
     export_c_func!(bzero(_, _)),
     // Functions shared with wchar.rs
     export_c_func!(memset(_, _, _)),
