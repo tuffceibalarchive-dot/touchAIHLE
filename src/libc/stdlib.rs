@@ -24,6 +24,8 @@ pub struct State {
     rand: u32,
     random: u32,
     arc4random: u32,
+    /// 48-bit state for the `drand48` family (only the low 48 bits are used).
+    rand48: u64,
     fcvt_buf: Option<MutPtr<u8>>,
 }
 
@@ -234,6 +236,65 @@ fn random(env: &mut Environment) -> i32 {
 
     env.libc_state.stdlib.random = prng(env.libc_state.stdlib.random);
     (env.libc_state.stdlib.random as i32) & RAND_MAX
+}
+
+// The POSIX `drand48` family: a 48-bit linear congruential generator,
+// X' = (a * X + c) mod 2^48, with a = 0x5DEECE66D and c = 0xB.
+const RAND48_A: u64 = 0x5DEECE66D;
+const RAND48_C: u64 = 0xB;
+const RAND48_MASK: u64 = (1 << 48) - 1;
+
+fn rand48_step(x: u64) -> u64 {
+    x.wrapping_mul(RAND48_A).wrapping_add(RAND48_C) & RAND48_MASK
+}
+fn rand48_load(env: &mut Environment, xsubi: MutPtr<u16>) -> u64 {
+    let w0 = env.mem.read(xsubi) as u64;
+    let w1 = env.mem.read(xsubi + 1) as u64;
+    let w2 = env.mem.read(xsubi + 2) as u64;
+    w0 | (w1 << 16) | (w2 << 32)
+}
+fn rand48_store(env: &mut Environment, xsubi: MutPtr<u16>, x: u64) {
+    env.mem.write(xsubi, x as u16);
+    env.mem.write(xsubi + 1, (x >> 16) as u16);
+    env.mem.write(xsubi + 2, (x >> 32) as u16);
+}
+fn rand48_to_f64(x: u64) -> f64 {
+    x as f64 / (1u64 << 48) as f64
+}
+
+fn srand48(env: &mut Environment, seed: i32) {
+    // High 32 bits come from the seed, low 16 bits are fixed to 0x330E.
+    env.libc_state.stdlib.rand48 = ((seed as u32 as u64) << 16) | 0x330E;
+}
+fn drand48(env: &mut Environment) -> f64 {
+    let x = rand48_step(env.libc_state.stdlib.rand48);
+    env.libc_state.stdlib.rand48 = x;
+    rand48_to_f64(x)
+}
+fn lrand48(env: &mut Environment) -> i32 {
+    let x = rand48_step(env.libc_state.stdlib.rand48);
+    env.libc_state.stdlib.rand48 = x;
+    (x >> 17) as i32
+}
+fn mrand48(env: &mut Environment) -> i32 {
+    let x = rand48_step(env.libc_state.stdlib.rand48);
+    env.libc_state.stdlib.rand48 = x;
+    (x >> 16) as u32 as i32
+}
+fn erand48(env: &mut Environment, xsubi: MutPtr<u16>) -> f64 {
+    let x = rand48_step(rand48_load(env, xsubi));
+    rand48_store(env, xsubi, x);
+    rand48_to_f64(x)
+}
+fn nrand48(env: &mut Environment, xsubi: MutPtr<u16>) -> i32 {
+    let x = rand48_step(rand48_load(env, xsubi));
+    rand48_store(env, xsubi, x);
+    (x >> 17) as i32
+}
+fn jrand48(env: &mut Environment, xsubi: MutPtr<u16>) -> i32 {
+    let x = rand48_step(rand48_load(env, xsubi));
+    rand48_store(env, xsubi, x);
+    (x >> 16) as u32 as i32
 }
 
 fn arc4random(env: &mut Environment) -> u32 {
@@ -673,6 +734,13 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(rand_r(_)),
     export_c_func!(srandom(_)),
     export_c_func!(random()),
+    export_c_func!(srand48(_)),
+    export_c_func!(drand48()),
+    export_c_func!(lrand48()),
+    export_c_func!(mrand48()),
+    export_c_func!(erand48(_)),
+    export_c_func!(nrand48(_)),
+    export_c_func!(jrand48(_)),
     export_c_func!(arc4random()),
     export_c_func!(div(_, _)),
     export_c_func!(getenv(_)),
