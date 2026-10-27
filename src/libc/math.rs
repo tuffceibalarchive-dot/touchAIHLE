@@ -512,6 +512,43 @@ fn hypot(env: &mut Environment, arg1: f64, arg2: f64) -> f64 {
     sqrt(env, arg1 * arg1 + arg2 * arg2)
 }
 
+fn hypotf(env: &mut Environment, arg1: f32, arg2: f32) -> f32 {
+    if arg1.is_infinite() || arg2.is_infinite() {
+        return f32::INFINITY;
+    }
+    sqrtf(env, arg1 * arg1 + arg2 * arg2)
+}
+fn cbrt(_env: &mut Environment, arg: f64) -> f64 {
+    arg.cbrt()
+}
+fn cbrtf(_env: &mut Environment, arg: f32) -> f32 {
+    arg.cbrt()
+}
+fn copysign(_env: &mut Environment, magnitude: f64, sign: f64) -> f64 {
+    magnitude.copysign(sign)
+}
+fn copysignf(_env: &mut Environment, magnitude: f32, sign: f32) -> f32 {
+    magnitude.copysign(sign)
+}
+fn fdim(_env: &mut Environment, arg1: f64, arg2: f64) -> f64 {
+    if arg1.is_nan() || arg2.is_nan() {
+        f64::NAN
+    } else if arg1 > arg2 {
+        arg1 - arg2
+    } else {
+        0.0
+    }
+}
+fn fdimf(_env: &mut Environment, arg1: f32, arg2: f32) -> f32 {
+    if arg1.is_nan() || arg2.is_nan() {
+        f32::NAN
+    } else if arg1 > arg2 {
+        arg1 - arg2
+    } else {
+        0.0
+    }
+}
+
 /// This alias is for readability, POSIX just uses `int`.
 type GuestFPCategory = i32;
 const FP_NAN: GuestFPCategory = 1;
@@ -617,5 +654,12 @@ pub const FUNCTIONS: FunctionExports = &[
     // Other
     export_c_func!(nan(_)),
     export_c_func!(hypot(_, _)),
+    export_c_func!(hypotf(_, _)),
+    export_c_func!(cbrt(_)),
+    export_c_func!(cbrtf(_)),
+    export_c_func!(copysign(_, _)),
+    export_c_func!(copysignf(_, _)),
+    export_c_func!(fdim(_, _)),
+    export_c_func!(fdimf(_, _)),
     export_c_func!(__fpclassifyf(_)),
 ];

@@ -161,6 +161,13 @@ fn atoi(env: &mut Environment, s: ConstPtr<u8>) -> i32 {
     res
 }
 
+fn labs(_env: &mut Environment, arg: i32) -> i32 {
+    arg.wrapping_abs()
+}
+fn llabs(_env: &mut Environment, arg: i64) -> i64 {
+    arg.wrapping_abs()
+}
+
 fn atol(env: &mut Environment, s: ConstPtr<u8>) -> i32 {
     atoi(env, s)
 }
@@ -726,6 +733,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(atexit(_)),
     export_c_func!(atoi(_)),
     export_c_func!(atol(_)),
+    export_c_func!(labs(_)),
+    export_c_func!(llabs(_)),
     export_c_func!(atof(_)),
     export_c_func!(strtod(_, _)),
     export_c_func!(srand(_)),
