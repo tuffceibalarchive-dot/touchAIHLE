@@ -22,8 +22,9 @@ use crate::libc::semaphore::{host_destroy_semaphore, sem_wait};
 use crate::mem::MutVoidPtr;
 use crate::objc::{
     autorelease, id, msg, msg_class, msg_send, msg_send_no_type_checking, nil, objc_classes,
-    retain, Class, ClassExports, NSZonePtr, ObjC, TrivialHostObject, SEL,
+    retain, Class, ClassExports, NSZonePtr, ObjC, TrivialHostObject, IMP, SEL,
 };
+use crate::objc::class_getMethodImplementation;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -250,6 +251,13 @@ forUndefinedKey:(id)key { // NSString*
 
 - (bool)respondsToSelector:(SEL)selector {
     env.objc.object_has_method(&env.mem, this, selector)
+}
+
+// Returns the function pointer for a method, so that callers (e.g. cocos2d's
+// timers) can skip the message dispatch. Only guest methods are supported.
+- (IMP)methodForSelector:(SEL)selector {
+    let class: Class = ObjC::read_isa(this, &env.mem);
+    class_getMethodImplementation(env, class, selector)
 }
 
 - (id)performSelector:(SEL)sel {
